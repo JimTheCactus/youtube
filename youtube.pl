@@ -117,7 +117,7 @@ sub show_result {
 		Irssi::print("Failed to find $server_tag in server tag list.");
 		return;
 	}
-	$server->command("msg $target YouTube: $retval") if $retval;
+	$server->command("msg $target \x031,16You\x0316,4Tube\x0F: $retval") if $retval;
 }
 
 

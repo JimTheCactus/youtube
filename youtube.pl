@@ -1,7 +1,9 @@
 use strict;
 use vars qw($VERSION %IRSSI);
 use Data::Dumper;
-
+use POSIX;
+use Time::HiRes qw/sleep/;
+use JSON;
 use LWP::UserAgent;
 
 use Irssi;
@@ -12,9 +14,8 @@ $VERSION = '20111124';
     name        => 'youtube',
     description => 'shows the title and description from the video',
     license     => 'Public Domain',
-    changed     => $VERSION,
+   changed     => $VERSION,
 );
-
 
 #
 # 20081105 - function rewrite
@@ -36,29 +37,14 @@ $VERSION = '20111124';
 #
 
 sub uri_public { 
-    my ($server, $data, $nick, $mask, $target) = @_; 
-    my $retval = uri_get($data); 
-    my $win = $server->window_item_find($target); 
-    Irssi::signal_continue(@_);
-
-    if ($win) { 
-        $win->print("%_YouTube:%_ $retval", MSGLEVEL_CRAP) if $retval; 
-    } else { 
-        Irssi::print("%_YouTube:%_ $retval") if $retval; 
-    } 
+	my ($server, $data, $nick, $mask, $target) = @_; 
+	my $url = uri_parse($data);
+	if ($url) {
+		process_url($server,$target,$url);
+	}
+	Irssi::signal_continue(@_);
 } 
-sub uri_private { 
-    my ($server, $data, $nick, $mask) = @_; 
-    my $retval = uri_get($data); 
-    my $win = Irssi::window_find_name('(msgs)'); 
-    Irssi::signal_continue(@_);
 
-    if ($win) { 
-        $win->print("%_YouTube:%_ $retval", MSGLEVEL_CRAP) if $retval; 
-    } else { 
-        Irssi::print("%_YouTube:%_ $retval") if $retval; 
-    } 
-} 
 sub uri_parse { 
     my ($url) = @_; 
     # Super RegEx courtesy of ridgerunner
@@ -68,48 +54,115 @@ sub uri_parse {
     } 
     return 0; 
 } 
+
 sub uri_get { 
-    my ($data) = @_; 
+	my ($url) = @_; 
 
-    my $url = uri_parse($data); 
+	if ($url) {
+		my $ua = LWP::UserAgent->new(env_proxy=>1, keep_alive=>1, timeout=>5); 
+		$ua->agent("irssi/$VERSION " . $ua->agent()); 
 
-    if ($url)
-    {
-        my $ua = LWP::UserAgent->new(env_proxy=>1, keep_alive=>1, timeout=>5); 
-        $ua->agent("irssi/$VERSION " . $ua->agent()); 
+		my $req = HTTP::Request->new('GET', $url); 
+		my $res = $ua->request($req);
 
-        my $req = HTTP::Request->new('GET', $url); 
-        my $res = $ua->request($req);
+		my $result_string = '';
+		my $json = JSON->new->utf8;
 
-        my $result_string = '';
-        my $json = JSON->new->utf8;
+		eval {
+			my $json_data = $json->decode($res->content());
 
-        eval {
-            my $json_data = $json->decode($res->content());
+			if ($res->is_success()) { 
+				eval {
+				$result_string = $json_data->{data}->{title};
+			} or do {
+					$result_string = "Request successful, parsing error";
+				};
+			} 
+			else {
+				eval {
+					$result_string = "Error $json_data->{error}->{code} $json_data->{error}->{message}";
+				} or do {
+					$result_string = "Parsing error";
+				};
+			}
+		}
+		or do {
+			$result_string = "Error " . $res->status_line;
+		};
 
-            if ($res->is_success()) { 
-                eval {
-                    $result_string = $json_data->{data}->{title};
-                } 
-                or do {
-                    $result_string = "Request successful, parsing error";
-                };
-            } 
-            else {
-                eval {
-                    $result_string = "Error $json_data->{error}->{code} $json_data->{error}->{message}";
-                } or do {
-                    $result_string = "Parsing error";
-                };
-            }
-        } 
-        or do {
-            $result_string = "Error " . $res->status_line;
-        };
-
-        return $result_string; 
-    }
+		chomp $result_string;
+		return $result_string; 
+	}
 } 
 
+# When we get data back from the pipe
+sub show_result {
+	my $args = shift;
+	my ($read_handle, $input_tag_ref, $job) = @$args;
+
+	# Read the result
+	my $line=<$read_handle>;
+	close($read_handle);
+	Irssi::input_remove($$input_tag_ref);
+	my ($server_tag,$target,$retval) = split("~~~SEP~~~",$line,3);
+	if (!$server_tag || !$target || !$retval) {
+		Irssi::print("Didn't receive usable data from child.");
+		return;
+	}
+
+	chomp $retval;	
+
+	my $server = Irssi::server_find_tag($server_tag);
+	if (!$server) {
+		Irssi::print("Failed to find $server_tag in server tag list.");
+		return;
+	}
+	$server->command("msg $target YouTube: $retval") if $retval;
+}
+
+
+sub process_url {
+	my ($server, $target, $url) = @_;
+	my ($parent_read_handle, $child_write_handle);
+
+
+	# Setup the interprocess communication pipe
+	pipe($parent_read_handle, $child_write_handle);
+
+	my $oldfh = select($child_write_handle);
+	$| = 1;
+	select $oldfh;
+
+	# Split off a child process.
+	my $pid = fork();
+	if (not defined $pid) {
+        	print("Can't fork: Aborting");
+	        close($child_write_handle);
+        	close($parent_read_handle);
+	        return;
+	}
+
+	if ($pid > 0) { # this is the parent (Irssi)
+		close ($child_write_handle);
+		Irssi::pidwait_add($pid);
+		my $job = $pid;
+		my $tag;
+		my @args = ($parent_read_handle, \$tag, $job);
+		#Spin up the output listener.
+	        $tag = Irssi::input_add(fileno($parent_read_handle),
+			Irssi::INPUT_READ,
+			\&show_result,
+			\@args);
+
+	} else { # child
+		my $description = uri_get($url);
+		my $server_tag = $server->{tag};
+
+		print $child_write_handle "$server_tag~~~SEP~~~$target~~~SEP~~~" . $description . "\n";
+		close($child_write_handle);
+		POSIX::_exit(1);
+	}
+}
+
+
 Irssi::signal_add_last('message public', 'uri_public'); 
-Irssi::signal_add_last('message private', 'uri_private'); 

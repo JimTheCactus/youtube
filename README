@@ -1,4 +1,4 @@
-YouTube URI Lookup Irssi Bot - It's better than your mama!
+YouTube URI Lookup Irssi Bot - It's better than your mama's vacuum!
 
 Parses Youtube URIs and uses Youtube's Data API (http://code.google.com/apis/youtube/overview.html) to output the link info to the channel.
 

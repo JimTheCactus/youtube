@@ -1,11 +1,11 @@
-YouTube URI Lookup Irssi Script - It's better than your mama!
+YouTube URI Lookup Irssi Bot - It's better than your mama's vacuum!
 
-Parses Youtube URIs and uses Youtube's Data API (http://code.google.com/apis/youtube/overview.html) to output the link info to the channel window.
-
-Also works in query windows, though you might get unexpected results if you are not using the "(msgs)" window for queries. Comments/improvments regarding this are more than welcome!
+Parses Youtube URIs and uses Youtube's Data API (http://code.google.com/apis/youtube/overview.html) to output the link info to the channel.
 
 Put the script in your Irssi scripts folder, run it and it just works. Tested in Perl 5.10.
 
-License blah blah: Do whatever you want with it, give credit to me if you think I deserve it. :)
+fkarlsson: License blah blah: Do whatever you want with it, give credit to me if you think I deserve it. :)
 
-Thanks to the original author tuqs!
+JimTheCactus: Same license as before! Use it, share it, love it!
+
+Thanks to the original author tuqs and the first derivator fkarlsson!

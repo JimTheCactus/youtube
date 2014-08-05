@@ -36,9 +36,14 @@ $VERSION = '20111124';
 # enjoy ;o)
 #
 
-sub uri_public { 
-	my ($server, $data, $nick, $mask, $target) = @_; 
-	my $url = uri_parse($data);
+sub process_message { 
+	my ($server, $data, $nick, $address) = @_;
+	my ($target, $text) = split(/ :/,$data,2);
+	#If we're the target (privmsg), then pivot it back to the sender.
+	if (lc($target) eq lc($server->{nick})) {
+		$target = $nick;
+	} 
+	my $url = uri_parse($text);
 	if ($url) {
 		process_url($server,$target,$url);
 	}
@@ -117,7 +122,7 @@ sub show_result {
 		Irssi::print("Failed to find $server_tag in server tag list.");
 		return;
 	}
-	$server->command("msg $target \x031,16You\x0316,4Tube\x0F: $retval") if $retval;
+	$server->command("msg $target \x031,0You\x030,4Tube\x0F: $retval") if $retval;
 }
 
 
@@ -165,4 +170,4 @@ sub process_url {
 }
 
 
-Irssi::signal_add_last('message public', 'uri_public'); 
+Irssi::signal_add_last('event privmsg', 'process_message'); 

@@ -49,6 +49,18 @@ sub process_message {
 	}
 	Irssi::signal_continue(@_);
 } 
+sub event_action {
+        my ($server, $text, $nick, $address, $target) = @_;
+	#If we're the target (privmsg), then pivot it back to the sender.
+	if (lc($target) eq lc($server->{nick})) {
+		$target = $nick;
+	} 
+	my $url = uri_parse($text);
+	if ($url) {
+		process_url($server,$target,$url);
+	}
+	Irssi::signal_continue(@_);
+}
 
 sub uri_parse { 
     my ($url) = @_; 
@@ -122,7 +134,7 @@ sub show_result {
 		Irssi::print("Failed to find $server_tag in server tag list.");
 		return;
 	}
-	$server->command("msg $target \x031,0You\x030,4Tube\x0F: $retval") if $retval;
+	$server->command("msg $target YouTube: $retval") if $retval;
 }
 
 
@@ -170,4 +182,5 @@ sub process_url {
 }
 
 
+Irssi::signal_add_last('message irc action', 'event_action');
 Irssi::signal_add_last('event privmsg', 'process_message'); 

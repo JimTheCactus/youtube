@@ -30,6 +30,7 @@ $VERSION = '20111124';
 # 20111030 - FIXED.
 # 20111101 - added a super regex courtesy of ridgerunner (http://stackoverflow.com/questions/5830387/php-regex-find-all-youtube-video-ids-in-string/5831191#5831191)
 # 20111124 - apparently the super regex didn't allow links without http://, so I made that part optional
+# 20150506 - Updated to account for depreciation of the v2 API
 #
 # usage:
 # /script load youtube
@@ -45,7 +46,6 @@ sub process_message {
 	} 
 	my $url = uri_parse($text);
 	if ($url) {
-		print $url;
 		process_url($server,$target,$url);
 	}
 	Irssi::signal_continue(@_);
@@ -70,7 +70,6 @@ sub uri_parse {
     if ($url =~ /(?:https?:\/\/)?(?:[0-9A-Z-]+\.)?(?:youtu\.be\/|youtube\.com\S*[^\w\-\s])([\w\-]{11})(?=[^\w\-]|$)(?![?=&+%\w]*(?:['"][^<>]*>|<\/a>))[?=&+%\w]*/ig) { 
 	my $api_key = Irssi::settings_get_str('YouTube_API_KEY');
 	return "https://www.googleapis.com/youtube/v3/videos?part=snippet&fields=items%2Fsnippet&id=$1&key=$api_key"
-#        return "http://gdata.youtube.com/feeds/api/videos/$1?v=2&alt=jsonc";
     } 
     return 0; 
 } 

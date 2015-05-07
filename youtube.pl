@@ -45,6 +45,7 @@ sub process_message {
 	} 
 	my $url = uri_parse($text);
 	if ($url) {
+		print $url;
 		process_url($server,$target,$url);
 	}
 	Irssi::signal_continue(@_);
@@ -67,7 +68,9 @@ sub uri_parse {
     # Super RegEx courtesy of ridgerunner
     # http://stackoverflow.com/questions/5830387/php-regex-find-all-youtube-video-ids-in-string/5831191#5831191
     if ($url =~ /(?:https?:\/\/)?(?:[0-9A-Z-]+\.)?(?:youtu\.be\/|youtube\.com\S*[^\w\-\s])([\w\-]{11})(?=[^\w\-]|$)(?![?=&+%\w]*(?:['"][^<>]*>|<\/a>))[?=&+%\w]*/ig) { 
-        return "http://gdata.youtube.com/feeds/api/videos/$1?v=2&alt=jsonc";
+	my $api_key = Irssi::settings_get_str('YouTube_API_KEY');
+	return "https://www.googleapis.com/youtube/v3/videos?part=snippet&fields=items%2Fsnippet&id=$1&key=$api_key"
+#        return "http://gdata.youtube.com/feeds/api/videos/$1?v=2&alt=jsonc";
     } 
     return 0; 
 } 
@@ -90,9 +93,12 @@ sub uri_get {
 
 			if ($res->is_success()) { 
 				eval {
-				$result_string = $json_data->{data}->{title};
-			} or do {
-					$result_string = "Request successful, parsing error";
+					my @items = @{$json_data->{items}};
+					my $snippet = $items[0]->{snippet};
+					# We only get one item since we only ever ask for one.
+					$result_string = $snippet->{title} . " by " . $snippet->{channelTitle};
+				} or do {
+					$result_string = "Request successful, parsing error. $@";
 				};
 			} 
 			else {
@@ -184,3 +190,4 @@ sub process_url {
 
 Irssi::signal_add_last('message irc action', 'event_action');
 Irssi::signal_add_last('event privmsg', 'process_message'); 
+Irssi::settings_add_str('YouTube','YouTube_API_KEY','');

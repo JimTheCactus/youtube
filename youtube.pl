@@ -95,7 +95,7 @@ sub uri_get {
 					my @items = @{$json_data->{items}};
 					my $snippet = $items[0]->{snippet};
 					# We only get one item since we only ever ask for one.
-					$result_string = $snippet->{title} . " by " . $snippet->{channelTitle};
+					$result_string = "\x1F" . $snippet->{title} . "\x0F by " . $snippet->{channelTitle};
 				} or do {
 					$result_string = "Request successful, parsing error. $@";
 				};
